@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-autolink",
-	"version": "1.0.0-beta",
+	"version": "1.0.0",
 	"description": "Automatically creates backlinks from and to notes with easy customizability.",
 	"main": "main.js",
 	"scripts": {
