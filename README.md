@@ -1,4 +1,4 @@
-# Obsidian-AutoLink
+# AutoLink
 
 Automatically creates backlinks between your notes with intelligent word completion and customizable behavior.
 
