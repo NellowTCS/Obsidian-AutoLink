@@ -1,7 +1,7 @@
 {
 	"id": "autolink",
 	"name": "Obsidian Autolink",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"minAppVersion": "0.15.0",
 	"description": "Automatically creates backlinks from and to notes with easy customizability.",
 	"author": "NellowTCS",
