@@ -60,6 +60,8 @@ export default class AutoLinkPlugin extends Plugin {
     line: number;
     original: string;
     cursor: { line: number; ch: number };
+    timestamp?: number; // Add timestamp for time-based undo window
+    linkText?: string; // The text of the linked note
   }> = [];
 
   // Track pending matches for wait-and-see behavior
@@ -114,7 +116,7 @@ export default class AutoLinkPlugin extends Plugin {
       )
     );
 
-    // Add immediate backspace/delete undo functionality
+    // IMPROVED backspace/delete undo functionality
     this.registerDomEvent(document, "keydown", (evt: KeyboardEvent) => {
       if (
         (evt.key === "Backspace" || evt.key === "Delete") &&
@@ -125,18 +127,45 @@ export default class AutoLinkPlugin extends Plugin {
           const cursor = activeView.editor.getCursor();
           const lastUndo = this.undoStack[this.undoStack.length - 1];
 
-          // Check if we're right after a recent auto-link
-          if (lastUndo && cursor.line === lastUndo.line) {
+          // Check if we're on the same line and have linkText to check against
+          if (lastUndo && cursor.line === lastUndo.line && lastUndo.linkText) {
             const currentLine = activeView.editor.getLine(cursor.line);
-            // If the line contains a link that wasn't in the original, offer immediate undo
-            if (
-              currentLine.includes("[[") &&
-              !lastUndo.original.includes("[[")
-            ) {
-              evt.preventDefault();
-              // Temporarily disable auto-linking to prevent chaos >:3
-              this.temporarilyDisableAutoLink();
-              this.undoLastAutolink(activeView.editor);
+
+            // Find all links and check if any match our last auto-linked note
+            const linkRegex = /\[\[([^|\]]+)(?:\|[^\]]+)?\]\]/g;
+            let match;
+            while ((match = linkRegex.exec(currentLine)) !== null) {
+              const baseText = match[1];
+
+              if (baseText === lastUndo.linkText) {
+                // This is the link we created. Check cursor position.
+                const linkStart = match.index;
+                const linkEnd = linkStart + match[0].length;
+
+                const isBackspaceNearLink =
+                  evt.key === "Backspace" &&
+                  cursor.ch > linkStart &&
+                  cursor.ch <= linkEnd;
+                const isDeleteNearLink =
+                  evt.key === "Delete" &&
+                  cursor.ch >= linkStart &&
+                  cursor.ch < linkEnd;
+
+                if (isBackspaceNearLink || isDeleteNearLink) {
+                  // Time-based check
+                  const timeSinceAutoLink =
+                    Date.now() - (lastUndo.timestamp || 0);
+                  const timeLimit = 30000; // 30 seconds
+
+                  if (!lastUndo.timestamp || timeSinceAutoLink <= timeLimit) {
+                    evt.preventDefault();
+                    this.temporarilyDisableAutoLink();
+                    this.undoLastAutolink(activeView.editor);
+                  }
+                  // Found our link and handled it, so we can stop searching
+                  return;
+                }
+              }
             }
           }
         }
@@ -177,6 +206,7 @@ export default class AutoLinkPlugin extends Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
   }
+
 
   updateNoteList() {
     this.noteTitles.clear();
@@ -329,16 +359,13 @@ export default class AutoLinkPlugin extends Plugin {
       }
     }
 
-    // Handle suggestions based on mode
+    // FIXED: Handle suggestions based on mode
     switch (this.settings.mode) {
       case "autonomous":
       case "semiAutonomous":
-        // Only show suggestions if multiple matches while typing (disambiguation)
-        if (matches.length > 1) {
-          this.handleSuggestionsMode(editor, matches, typed);
-        } else {
-          this.closePopup();
-        }
+        // In autonomous modes, NEVER show suggestions popup
+        // The wait-and-see logic and single-match auto-linking is handled above
+        this.closePopup();
         break;
 
       case "suggestions":
@@ -419,11 +446,13 @@ export default class AutoLinkPlugin extends Plugin {
     const cursor = editor.getCursor();
     const line = editor.getLine(cursor.line);
 
-    // Store for undo
+    // Store for undo WITH TIMESTAMP
     this.undoStack.push({
       line: cursor.line,
       original: line,
       cursor: { line: cursor.line, ch: cursor.ch },
+      timestamp: Date.now(),
+      linkText: match.file.basename,
     });
 
     // Create the link
@@ -466,11 +495,13 @@ export default class AutoLinkPlugin extends Plugin {
       const match = matches[0];
       const line = editor.getLine(cursor.line);
 
-      // Store for undo
+      // Store for undo WITH TIMESTAMP
       this.undoStack.push({
         line: cursor.line,
         original: line,
         cursor: { line: cursor.line, ch: cursor.ch },
+        timestamp: Date.now(),
+        linkText: match.file.basename,
       });
 
       // Create the link
@@ -514,23 +545,6 @@ export default class AutoLinkPlugin extends Plugin {
     matches: Array<{ title: string; file: TFile; isAlias: boolean }>,
     typed: string
   ) {
-    // Don't show popup in autonomous mode when there are multiple matches with same prefix
-    if (
-      (this.settings.mode === "autonomous" ||
-        this.settings.mode === "semiAutonomous") &&
-      matches.length > 1
-    ) {
-      // Check if all matches share a common prefix longer than what's typed
-      const commonPrefix = this.findCommonPrefix(
-        matches.map((m) => m.title.toLowerCase())
-      );
-      if (commonPrefix.length > typed.length) {
-        // Wait for more typing instead of showing popup
-        this.closePopup();
-        return;
-      }
-    }
-
     this.closePopup();
 
     // Get cursor position for popup placement
@@ -635,11 +649,13 @@ export default class AutoLinkPlugin extends Plugin {
     const cursor = editor.getCursor();
     const line = editor.getLine(cursor.line);
 
-    // Store for undo
+    // Store for undo WITH TIMESTAMP
     this.undoStack.push({
       line: cursor.line,
       original: line,
       cursor: { line: cursor.line, ch: cursor.ch },
+      timestamp: Date.now(),
+      linkText: match.file.basename,
     });
 
     const link = `[[${match.file.basename}${
