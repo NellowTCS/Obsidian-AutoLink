@@ -75,3 +75,13 @@ Provides full customization over when and how backlinks are created.
 - Built with TypeScript and Svelte
 - Debounced input processing for performance
 - Intelligent cursor positioning and conflict detection
+
+## Star History
+
+<a href="https://www.star-history.com/#NellowTCS/Obsidian-AutoLink&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=NellowTCS/Obsidian-AutoLink&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=NellowTCS/Obsidian-AutoLink&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=NellowTCS/Obsidian-AutoLink&type=Date" />
+ </picture>
+</a>
