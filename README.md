@@ -1,6 +1,6 @@
 # AutoLink
 
-[![All Contributors](https://img.shields.io/github/all-contributors/projectOwner/projectName?color=ee8449&style=flat-square)](#contributors)
+[![GitHub contributors from allcontributors.org](https://img.shields.io/github/all-contributors/NellowTCS/Obsidian-AutoLink)](#contributors)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/NellowTCS/Obsidian-AutoLink/release.yml) ![GitHub License](https://img.shields.io/github/license/NellowTCS/Obsidian-Autolink) 
  
 
