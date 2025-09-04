@@ -85,3 +85,14 @@ Provides full customization over when and how backlinks are created.
    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=NellowTCS/Obsidian-AutoLink&type=Date" />
  </picture>
 </a>
+
+## Contributors
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
