@@ -1,5 +1,9 @@
 # AutoLink
 
+[![All Contributors](https://img.shields.io/github/all-contributors/projectOwner/projectName?color=ee8449&style=flat-square)](#contributors)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/NellowTCS/Obsidian-AutoLink/release.yml) ![GitHub License](https://img.shields.io/github/license/NellowTCS/Obsidian-Autolink) 
+ 
+
 Automatically creates backlinks between your notes with intelligent word completion and customizable behavior.
 
 ## Features
