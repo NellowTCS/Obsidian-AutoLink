@@ -4,9 +4,7 @@ on:
   push:
     branches:
       - main
-    tags:
-      - '*'          # optional: produce artifact for tag pushes as well
-  workflow_dispatch:  # allow manual runs
+  workflow_dispatch:
 
 jobs:
   build:
@@ -42,11 +40,11 @@ jobs:
           set -euo pipefail
           mkdir -p build-output
 
-          # copy dist/main.js -> build-output/main.js
-          if [ -f "dist/main.js" ]; then
-            cp -v dist/main.js build-output/main.js
+          # copy main.js -> build-output/main.js
+          if [ -f "main.js" ]; then
+            cp -v main.js build-output/main.js
           else
-            echo "Error: dist/main.js not found."
+            echo "Error: main.js not found."
             ls -la dist || true
             exit 1
           fi
