@@ -34,12 +34,6 @@ jobs:
       - name: Install dependencies
         run: npm i
 
-      - name: Read package metadata
-        id: meta
-        run: |
-          echo "package_name=$(node -p \"require('./package.json').name\")" >> $GITHUB_OUTPUT
-          echo "package_version=$(node -p \"require('./package.json').version\")" >> $GITHUB_OUTPUT
-
       - name: Build plugin
         run: npm run build
 
