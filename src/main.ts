@@ -7,6 +7,8 @@ import {
   PluginSettingTab,
   App,
   Setting,
+  debounce,
+  normalizePath,
 } from "obsidian";
 import SuggestionPopup from "./SuggestionPopup.svelte";
 import { mount, unmount } from "svelte";
@@ -21,7 +23,6 @@ interface AutoLinkSettings {
   customFolders: string[];
   debounceMs: number;
   maxSuggestions: number;
-  // New settings for custom mode
   customAllowEnterAccept: boolean;
   customAutoInsertSingleMatch: boolean;
 }
@@ -54,69 +55,83 @@ export default class AutoLinkPlugin extends Plugin {
   noteTitles: Map<string, TFile> = new Map();
   aliases: Map<string, TFile> = new Map();
   popup: any = null;
-  debounceTimer: number | null = null;
   lastTypedWord: string = "";
   undoStack: Array<{
     line: number;
     original: string;
     cursor: { line: number; ch: number };
-    timestamp?: number; // Add timestamp for time-based undo window
-    linkText?: string; // The text of the linked note
+    timestamp?: number;
+    linkText?: string;
   }> = [];
 
-  // Track pending matches for wait-and-see behavior
   pendingMatches: Map<
     string,
     Array<{ title: string; file: TFile; isAlias: boolean }>
   > = new Map();
-  // Add flag to temporarily disable auto-linking to prevent chaos during undo
   isAutoLinkDisabled: boolean = false;
   disableTimeout: number | null = null;
+
+  // will be set in onload using Obsidian debounce()
+  handleEditorChangeDebounced: (editor: Editor, view: MarkdownView) => void =
+    () => {};
 
   async onload() {
     await this.loadSettings();
 
-    console.log("AutoLink plugin loaded");
+    // Only log in dev builds
+    if ((import.meta as any).env?.DEV) {
+      console.log("AutoLink plugin loaded");
+    }
 
     // Build initial note and alias lists
     this.updateNoteList();
 
-    // Listen for file operations
-    this.registerEvent(
-      this.app.vault.on("create", (file) => {
-        if (file instanceof TFile && file.extension === "md") {
-          this.updateNoteList();
-        }
-      })
-    );
+    // Wait for layout ready before registering events so we don't re-run on startup passes
+    this.app.workspace.onLayoutReady(() => {
+      // Vault events
+      this.registerEvent(
+        this.app.vault.on("create", (file) => {
+          if (file instanceof TFile && file.extension === "md") {
+            this.updateNoteList();
+          }
+        })
+      );
 
-    this.registerEvent(
-      this.app.vault.on("rename", (file) => {
-        if (file instanceof TFile && file.extension === "md") {
-          this.updateNoteList();
-        }
-      })
-    );
+      this.registerEvent(
+        this.app.vault.on("rename", (file) => {
+          if (file instanceof TFile && file.extension === "md") {
+            this.updateNoteList();
+          }
+        })
+      );
 
-    this.registerEvent(
-      this.app.vault.on("delete", (file) => {
-        if (file instanceof TFile && file.extension === "md") {
-          this.updateNoteList();
-        }
-      })
-    );
+      this.registerEvent(
+        this.app.vault.on("delete", (file) => {
+          if (file instanceof TFile && file.extension === "md") {
+            this.updateNoteList();
+          }
+        })
+      );
 
-    // Editor change handler with debouncing
-    this.registerEvent(
-      this.app.workspace.on(
-        "editor-change",
+      // Use Obsidian debounce API for editor changes
+      this.handleEditorChangeDebounced = debounce(
         (editor: Editor, view: MarkdownView) => {
-          this.handleEditorChangeDebounced(editor, view);
-        }
-      )
-    );
+          this.handleEditorChange(editor, view);
+        },
+        this.settings.debounceMs
+      );
 
-    // IMPROVED backspace/delete undo functionality
+      this.registerEvent(
+        this.app.workspace.on(
+          "editor-change",
+          (editor: Editor, view: MarkdownView) => {
+            this.handleEditorChangeDebounced(editor, view);
+          }
+        )
+      );
+    });
+
+    // IMPROVED backspace/delete undo functionality (unchanged)
     this.registerDomEvent(document, "keydown", (evt: KeyboardEvent) => {
       if (
         (evt.key === "Backspace" || evt.key === "Delete") &&
@@ -127,18 +142,15 @@ export default class AutoLinkPlugin extends Plugin {
           const cursor = activeView.editor.getCursor();
           const lastUndo = this.undoStack[this.undoStack.length - 1];
 
-          // Check if we're on the same line and have linkText to check against
           if (lastUndo && cursor.line === lastUndo.line && lastUndo.linkText) {
             const currentLine = activeView.editor.getLine(cursor.line);
 
-            // Find all links and check if any match our last auto-linked note
             const linkRegex = /\[\[([^|\]]+)(?:\|[^\]]+)?\]\]/g;
             let match;
             while ((match = linkRegex.exec(currentLine)) !== null) {
               const baseText = match[1];
 
               if (baseText === lastUndo.linkText) {
-                // This is the link we created. Check cursor position.
                 const linkStart = match.index;
                 const linkEnd = linkStart + match[0].length;
 
@@ -152,7 +164,6 @@ export default class AutoLinkPlugin extends Plugin {
                   cursor.ch < linkEnd;
 
                 if (isBackspaceNearLink || isDeleteNearLink) {
-                  // Time-based check
                   const timeSinceAutoLink =
                     Date.now() - (lastUndo.timestamp || 0);
                   const timeLimit = 30000; // 30 seconds
@@ -162,7 +173,6 @@ export default class AutoLinkPlugin extends Plugin {
                     this.temporarilyDisableAutoLink();
                     this.undoLastAutolink(activeView.editor);
                   }
-                  // Found our link and handled it, so we can stop searching
                   return;
                 }
               }
@@ -189,11 +199,11 @@ export default class AutoLinkPlugin extends Plugin {
   }
 
   onunload() {
-    console.log("AutoLink plugin unloaded");
-    this.closePopup();
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
+    if ((import.meta as any).env?.DEV) {
+      console.log("AutoLink plugin unloaded");
     }
+    this.closePopup();
+    // No manual debounce timer to clear when using Obsidian debounce()
     if (this.disableTimeout) {
       clearTimeout(this.disableTimeout);
     }
@@ -207,7 +217,6 @@ export default class AutoLinkPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
-
   updateNoteList() {
     this.noteTitles.clear();
     this.aliases.clear();
@@ -215,14 +224,12 @@ export default class AutoLinkPlugin extends Plugin {
     const files = this.getRelevantFiles();
 
     files.forEach((file) => {
-      // Add file basename
       const basename = file.basename;
       this.noteTitles.set(
         this.settings.caseSensitive ? basename : basename.toLowerCase(),
         file
       );
 
-      // Add aliases if enabled
       if (this.settings.includeAliases) {
         const cache = this.app.metadataCache.getFileCache(file);
         if (cache?.frontmatter?.aliases) {
@@ -268,29 +275,15 @@ export default class AutoLinkPlugin extends Plugin {
     return allFiles;
   }
 
-  handleEditorChangeDebounced(editor: Editor, view: MarkdownView) {
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
-    }
-
-    this.debounceTimer = window.setTimeout(() => {
-      this.handleEditorChange(editor, view);
-    }, this.settings.debounceMs);
-  }
-
   handleEditorChange(editor: Editor, view: MarkdownView) {
     if (!editor || !view) return;
-
-    // Don't process if auto-linking is temporarily disabled
     if (this.isAutoLinkDisabled) return;
 
     const cursor = editor.getCursor();
     const line = editor.getLine(cursor.line);
 
-    // Don't process if cursor is inside existing link
     if (this.isInsideLink(line, cursor.ch)) return;
 
-    // Get current word being typed
     const beforeCursor = line.slice(0, cursor.ch);
     const match = beforeCursor.match(/[\w\s\-_]+$/);
     if (!match) {
@@ -306,27 +299,22 @@ export default class AutoLinkPlugin extends Plugin {
       return;
     }
 
-    // Avoid linking to current file
     const currentFile = view.file;
     const currentBasename = currentFile?.basename || "";
     const matches = this.findMatches(typed, currentBasename);
 
-    // Store current matches for wait-and-see behavior
     this.pendingMatches.set(typed, matches);
 
-    // Check if we just completed a word (typed space, punctuation, etc.)
     const justTypedChar = cursor.ch > 0 ? line[cursor.ch - 1] : "";
     const isWordCompleting = /[\s.,!?;:()[\]{}|\\/<>@#$%^&*+=~`"'-]/.test(
       justTypedChar
     );
 
-    // Handle word completion for autonomous modes
     if (
       (this.settings.mode === "autonomous" ||
         this.settings.mode === "semiAutonomous") &&
       isWordCompleting
     ) {
-      // Look for the completed word before the delimiter
       const beforeDelimiter = line.slice(0, cursor.ch - 1);
       const wordMatch = beforeDelimiter.match(/[\w\s\-_]+$/);
 
@@ -337,10 +325,7 @@ export default class AutoLinkPlugin extends Plugin {
           currentBasename
         );
 
-        // Wait-and-see logic: only auto-link if there's exactly one match
-        // OR if we had multiple matches before but now only one matches the completed word
         if (completedMatches.length === 1) {
-          // Check if we were waiting on this word
           const wasWaiting =
             this.pendingMatches.has(completedWord) &&
             this.pendingMatches.get(completedWord)!.length > 1;
@@ -359,12 +344,9 @@ export default class AutoLinkPlugin extends Plugin {
       }
     }
 
-    // FIXED: Handle suggestions based on mode
     switch (this.settings.mode) {
       case "autonomous":
       case "semiAutonomous":
-        // In autonomous modes, NEVER show suggestions popup
-        // The wait-and-see logic and single-match auto-linking is handled above
         this.closePopup();
         break;
 
@@ -374,7 +356,6 @@ export default class AutoLinkPlugin extends Plugin {
 
       case "custom":
         if (matches.length === 1 && this.settings.customAutoInsertSingleMatch) {
-          // Auto-insert single matches in custom mode if enabled
           this.handleAutonomousMode(editor, typed, matches, cursor);
         } else if (matches.length > 0) {
           this.handleSuggestionsMode(editor, matches, typed);
@@ -386,16 +367,13 @@ export default class AutoLinkPlugin extends Plugin {
   }
 
   isInsideLink(line: string, ch: number): boolean {
-    // Check if cursor is inside [[link]] or [text](url)
     const beforeCursor = line.slice(0, ch);
     const afterCursor = line.slice(ch);
 
-    // Wiki-style links
     const openBrackets = (beforeCursor.match(/\[\[/g) || []).length;
     const closeBrackets = (beforeCursor.match(/\]\]/g) || []).length;
     if (openBrackets > closeBrackets) return true;
 
-    // Markdown links
     const lastOpenBracket = beforeCursor.lastIndexOf("[");
     const lastCloseBracket = beforeCursor.lastIndexOf("]");
     if (lastOpenBracket > lastCloseBracket && afterCursor.includes("]("))
@@ -757,7 +735,8 @@ class AutoLinkSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "AutoLink Settings" });
+    // use Setting().setHeading() for grouped headings
+    new Setting(containerEl).setName("General").setHeading();
 
     new Setting(containerEl)
       .setName("Mode")
@@ -773,7 +752,6 @@ class AutoLinkSettingTab extends PluginSettingTab {
             this.plugin.settings.mode = value as Mode;
             await this.plugin.saveSettings();
             this.plugin.updateNoteList();
-            // Refresh settings display to show/hide custom options
             this.display();
           })
       );
@@ -829,6 +807,13 @@ class AutoLinkSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.debounceMs = value;
             await this.plugin.saveSettings();
+            // recreate debounced handler with new delay if workspace is ready
+            (this.plugin as any).handleEditorChangeDebounced = debounce(
+              (editor: Editor, view: MarkdownView) => {
+                (this.plugin as any).handleEditorChange(editor, view);
+              },
+              this.plugin.settings.debounceMs
+            );
           })
       );
 
@@ -846,9 +831,9 @@ class AutoLinkSettingTab extends PluginSettingTab {
           })
       );
 
-    // Custom mode settings - only show when custom mode is selected
     if (this.plugin.settings.mode === "custom") {
-      containerEl.createEl("h3", { text: "Custom Mode Settings" });
+      // Use a descriptive heading without the word "settings"
+      new Setting(containerEl).setName("Custom mode").setHeading();
 
       new Setting(containerEl)
         .setName("Allow Enter to accept suggestions")
@@ -886,9 +871,10 @@ class AutoLinkSettingTab extends PluginSettingTab {
             .setPlaceholder("folder1, folder2/subfolder, /")
             .setValue(this.plugin.settings.customFolders.join(", "))
             .onChange(async (value) => {
+              // Normalize user-provided paths
               this.plugin.settings.customFolders = value
                 .split(",")
-                .map((f) => f.trim())
+                .map((f) => normalizePath(f.trim()))
                 .filter((f) => f.length > 0);
               await this.plugin.saveSettings();
               this.plugin.updateNoteList();
