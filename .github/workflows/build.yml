@@ -1,0 +1,77 @@
+name: Build Obsidian plugin
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'          # optional: produce artifact for tag pushes as well
+  workflow_dispatch:  # allow manual runs
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18.x"
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Read package metadata
+        id: meta
+        run: |
+          echo "package_name=$(node -p \"require('./package.json').name\")" >> $GITHUB_OUTPUT
+          echo "package_version=$(node -p \"require('./package.json').version\")" >> $GITHUB_OUTPUT
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Collect dist/main.js and manifest.json
+        run: |
+          set -euo pipefail
+          mkdir -p build-output
+
+          # copy dist/main.js -> build-output/main.js
+          if [ -f "dist/main.js" ]; then
+            cp -v dist/main.js build-output/main.js
+          else
+            echo "Error: dist/main.js not found."
+            ls -la dist || true
+            exit 1
+          fi
+
+          # copy manifest.json from repo root
+          if [ -f "manifest.json" ]; then
+            cp -v manifest.json build-output/manifest.json
+          else
+            echo "Error: manifest.json not found in repository root."
+            exit 2
+          fi
+
+          echo "build-output contents:"
+          ls -la build-output
+
+      - name: Upload artifact (main.js + manifest.json)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.package_name }}-${{ steps.meta.outputs.package_version }}-${{ github.run_id }}
+          path: |
+            build-output/main.js
+            build-output/manifest.json
