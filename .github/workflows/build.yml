@@ -36,6 +36,7 @@ jobs:
         run: npm run build
 
       - name: Collect dist/main.js and manifest.json
+        id: meta
         run: |
           set -euo pipefail
           mkdir -p build-output
