@@ -131,7 +131,6 @@ export default class AutoLinkPlugin extends Plugin {
       );
     });
 
-    // IMPROVED backspace/delete undo functionality (unchanged)
     this.registerDomEvent(document, "keydown", (evt: KeyboardEvent) => {
       if (
         (evt.key === "Backspace" || evt.key === "Delete") &&
@@ -280,11 +279,24 @@ export default class AutoLinkPlugin extends Plugin {
     if (this.isAutoLinkDisabled) return;
 
     const cursor = editor.getCursor();
-    const line = editor.getLine(cursor.line);
+    let line = editor.getLine(cursor.line);
 
-    if (this.isInsideLink(line, cursor.ch)) return;
+    // Strip leading whitespace and bullet markers (-, *, +, or numbered lists like 1.)
+    // This allows auto-linking to work in bullet points
+    const bulletMatch = line.match(/^(\s*)([-*+]|\d+\.)\s+/);
+    let bulletPrefix = "";
+    let processedLine = line;
+    let processedCursorCh = cursor.ch;
 
-    const beforeCursor = line.slice(0, cursor.ch);
+    if (bulletMatch) {
+      bulletPrefix = bulletMatch[0];
+      processedLine = line.slice(bulletPrefix.length);
+      processedCursorCh = Math.max(0, cursor.ch - bulletPrefix.length);
+    }
+
+    if (this.isInsideLink(processedLine, processedCursorCh)) return;
+
+    const beforeCursor = processedLine.slice(0, processedCursorCh);
     const match = beforeCursor.match(/[\w\s\-_]+$/);
     if (!match) {
       this.closePopup();
@@ -305,7 +317,11 @@ export default class AutoLinkPlugin extends Plugin {
 
     this.pendingMatches.set(typed, matches);
 
+    // FIX: Use the original line for checking the just typed char, or correctly index processedLine
+    // The previous error was using processedLine[processedCursorCh - 1] which might be correct if processedCursorCh is aligned,
+    // but checks against cursor.ch are safer for raw input detection.
     const justTypedChar = cursor.ch > 0 ? line[cursor.ch - 1] : "";
+
     const isWordCompleting = /[\s.,!?;:()[\]{}|\\/<>@#$%^&*+=~`"'-]/.test(
       justTypedChar
     );
@@ -315,7 +331,8 @@ export default class AutoLinkPlugin extends Plugin {
         this.settings.mode === "semiAutonomous") &&
       isWordCompleting
     ) {
-      const beforeDelimiter = line.slice(0, cursor.ch - 1);
+      // Use processedCursorCh for slicing the processed line
+      const beforeDelimiter = processedLine.slice(0, processedCursorCh - 1);
       const wordMatch = beforeDelimiter.match(/[\w\s\-_]+$/);
 
       if (wordMatch) {
@@ -335,7 +352,8 @@ export default class AutoLinkPlugin extends Plugin {
               editor,
               completedWord,
               completedMatches[0],
-              cursor.ch - 1
+              processedCursorCh - 1,
+              bulletPrefix
             );
             this.pendingMatches.clear();
             return;
@@ -356,7 +374,13 @@ export default class AutoLinkPlugin extends Plugin {
 
       case "custom":
         if (matches.length === 1 && this.settings.customAutoInsertSingleMatch) {
-          this.handleAutonomousMode(editor, typed, matches, cursor);
+          this.handleAutonomousMode(
+            editor,
+            typed,
+            matches,
+            { line: cursor.line, ch: processedCursorCh },
+            bulletPrefix
+          );
         } else if (matches.length > 0) {
           this.handleSuggestionsMode(editor, matches, typed);
         } else {
@@ -419,12 +443,12 @@ export default class AutoLinkPlugin extends Plugin {
     editor: Editor,
     completedWord: string,
     match: { title: string; file: TFile; isAlias: boolean },
-    delimiterPos: number
+    delimiterPos: number,
+    bulletPrefix: string = ""
   ) {
     const cursor = editor.getCursor();
     const line = editor.getLine(cursor.line);
 
-    // Store for undo WITH TIMESTAMP
     this.undoStack.push({
       line: cursor.line,
       original: line,
@@ -438,19 +462,25 @@ export default class AutoLinkPlugin extends Plugin {
       match.isAlias ? "|" + match.title : ""
     }]]`;
 
-    // Find the start position of the completed word
-    const beforeDelimiter = line.slice(0, delimiterPos);
+    // Find the start position of the completed word in the processed line (without bullet)
+    const processedLine = line.slice(bulletPrefix.length);
+    const beforeDelimiter = processedLine.slice(0, delimiterPos);
     const wordStart = Math.max(
       0,
       beforeDelimiter.length - completedWord.length
     );
 
     // Replace the completed word with the link, keeping the delimiter
-    const newLine = line.slice(0, wordStart) + link + line.slice(delimiterPos);
+    // Account for bullet prefix when reconstructing the full line
+    const newLine =
+      bulletPrefix +
+      processedLine.slice(0, wordStart) +
+      link +
+      processedLine.slice(delimiterPos);
     editor.setLine(cursor.line, newLine);
 
     // Position cursor after the link and delimiter, but ensure it's within bounds
-    const newCursorPos = wordStart + link.length + 1;
+    const newCursorPos = bulletPrefix.length + wordStart + link.length + 1;
     editor.setCursor({
       line: cursor.line,
       ch: Math.min(newLine.length, newCursorPos),
@@ -466,18 +496,18 @@ export default class AutoLinkPlugin extends Plugin {
     editor: Editor,
     typed: string,
     matches: Array<{ title: string; file: TFile; isAlias: boolean }>,
-    cursor: any
+    cursor: any,
+    bulletPrefix: string = ""
   ) {
     // Only auto-link if there's exactly one match
     if (matches.length === 1) {
       const match = matches[0];
-      const line = editor.getLine(cursor.line);
+      const line = editor.getLine(cursor.line); // Get fresh line from editor using original cursor
 
-      // Store for undo WITH TIMESTAMP
       this.undoStack.push({
         line: cursor.line,
         original: line,
-        cursor: { line: cursor.line, ch: cursor.ch },
+        cursor: { line: cursor.line, ch: cursor.ch }, // Use original cursor ch for undo
         timestamp: Date.now(),
         linkText: match.file.basename,
       });
@@ -487,14 +517,18 @@ export default class AutoLinkPlugin extends Plugin {
         match.isAlias ? "|" + match.title : ""
       }]]`;
 
-      const newLine = line.replace(
+      const processedLine = line.slice(bulletPrefix.length);
+      const newProcessedLine = processedLine.replace(
         new RegExp(`${this.escapeRegex(typed)}$`),
         link
       );
+      const newLine = bulletPrefix + newProcessedLine;
       editor.setLine(cursor.line, newLine);
+
+      const currentCursor = editor.getCursor();
       editor.setCursor({
-        line: cursor.line,
-        ch: cursor.ch - typed.length + link.length,
+        line: currentCursor.line,
+        ch: currentCursor.ch - typed.length + link.length,
       });
 
       // Keep only last 10 undo operations
@@ -535,7 +569,6 @@ export default class AutoLinkPlugin extends Plugin {
     document.body.appendChild(popupContainer);
 
     try {
-      // Use Svelte 5's mount function instead of new Component()
       this.popup = mount(SuggestionPopup, {
         target: popupContainer,
         props: {
@@ -599,7 +632,7 @@ export default class AutoLinkPlugin extends Plugin {
       // Fallback method
     }
 
-    // Fallback: approximate position - position popup BELOW the current line
+    // Fallback: approximate position: position popup below the current line
     const editorEl =
       (editor as EditorExtended).containerEl ||
       document.querySelector(".cm-editor");
@@ -627,7 +660,6 @@ export default class AutoLinkPlugin extends Plugin {
     const cursor = editor.getCursor();
     const line = editor.getLine(cursor.line);
 
-    // Store for undo WITH TIMESTAMP
     this.undoStack.push({
       line: cursor.line,
       original: line,
@@ -832,7 +864,6 @@ class AutoLinkSettingTab extends PluginSettingTab {
       );
 
     if (this.plugin.settings.mode === "custom") {
-      // Use a descriptive heading without the word "settings"
       new Setting(containerEl).setName("Custom mode").setHeading();
 
       new Setting(containerEl)
