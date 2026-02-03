@@ -99,6 +99,7 @@ Provides full customization over when and how backlinks are created.
   <tbody>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/Moyf"><img src="https://avatars.githubusercontent.com/u/4013062?v=4?s=100" width="100px;" alt="Moy"/><br /><sub><b>Moy</b></sub></a><br /><a href="#bug-Moyf" title="Bug reports">🐛</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/JoonasBjork"><img src="https://avatars.githubusercontent.com/u/73201140?v=4?s=100" width="100px;" alt="JoonasBjork"/><br /><sub><b>JoonasBjork</b></sub></a><br /><a href="#bug-JoonasBjork" title="Bug reports">🐛</a></td>
     </tr>
   </tbody>
 </table>
