@@ -51,7 +51,8 @@ const context = await esbuild.context({
 
 if (prod) {
   await context.rebuild();
-  process.exitCode = 0;
+  await context.dispose();
+  console.log("Build complete.");
 } else {
   await context.watch();
 }
