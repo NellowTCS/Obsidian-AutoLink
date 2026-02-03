@@ -304,22 +304,23 @@ export default class AutoLinkPlugin extends Plugin {
       return;
     }
 
-    const typed = match[0].trim();
+    const currentFile = view.file;
+    const currentBasename = currentFile?.basename || "";
+
+    // Instead of blindly taking the whole match which might include non-note words (e.g. "baz bar"),
+    // we try to find the best matching suffix.
+    const bestMatch = this.getBestMatch(match[0], currentBasename);
+    const typed = bestMatch.term;
+    const matches = bestMatch.matches;
+
     if (typed.length < this.settings.minWordLength) {
       this.closePopup();
       this.pendingMatches.clear();
       return;
     }
 
-    const currentFile = view.file;
-    const currentBasename = currentFile?.basename || "";
-    const matches = this.findMatches(typed, currentBasename);
-
     this.pendingMatches.set(typed, matches);
 
-    // FIX: Use the original line for checking the just typed char, or correctly index processedLine
-    // The previous error was using processedLine[processedCursorCh - 1] which might be correct if processedCursorCh is aligned,
-    // but checks against cursor.ch are safer for raw input detection.
     const justTypedChar = cursor.ch > 0 ? line[cursor.ch - 1] : "";
 
     const isWordCompleting = /[\s.,!?;:()[\]{}|\\/<>@#$%^&*+=~`"'-]/.test(
@@ -336,11 +337,11 @@ export default class AutoLinkPlugin extends Plugin {
       const wordMatch = beforeDelimiter.match(/[\w\s\-_]+$/);
 
       if (wordMatch) {
-        const completedWord = wordMatch[0].trim();
-        const completedMatches = this.findMatches(
-          completedWord,
-          currentBasename
-        );
+        // Also apply best match logic here to find the actual completed word
+        // e.g., if we had "baz bar", we want "bar"
+        const completedBestMatch = this.getBestMatch(wordMatch[0], currentBasename);
+        const completedWord = completedBestMatch.term;
+        const completedMatches = completedBestMatch.matches;
 
         if (completedMatches.length === 1) {
           const wasWaiting =
@@ -388,6 +389,44 @@ export default class AutoLinkPlugin extends Plugin {
         }
         break;
     }
+  }
+
+  // helper method to find the longest suffix that matches a note
+  getBestMatch(
+    text: string,
+    currentBasename: string
+  ): {
+    term: string;
+    matches: Array<{ title: string; file: TFile; isAlias: boolean }>;
+  } {
+    let candidate = text;
+    // Limit iterations to prevent potential performance issues with very long strings
+    const maxIterations = 10;
+    let iterations = 0;
+
+    while (candidate.length > 0 && iterations < maxIterations) {
+      const trimmed = candidate.trim();
+      if (trimmed.length >= this.settings.minWordLength) {
+        const matches = this.findMatches(trimmed, currentBasename);
+        if (matches.length > 0) {
+          return { term: trimmed, matches };
+        }
+      }
+
+      const spaceIndex = candidate.indexOf(" ");
+      if (spaceIndex === -1) break;
+      candidate = candidate.slice(spaceIndex + 1);
+      iterations++;
+    }
+
+    // Fallback: return the last word component if no matches found
+    // This ensures "baz bar" -> "bar" for the popup even if no matches exist
+    const lastSpace = text.lastIndexOf(" ");
+    if (lastSpace !== -1) {
+        return { term: text.slice(lastSpace + 1).trim(), matches: [] };
+    }
+
+    return { term: text.trim(), matches: [] };
   }
 
   isInsideLink(line: string, ch: number): boolean {
