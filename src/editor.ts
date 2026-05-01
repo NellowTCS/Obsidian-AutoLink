@@ -198,15 +198,15 @@ export function temporarilyDisableAutoLink(plugin: AutoLinkPluginContext) {
 export function undoLastAutolink(
   plugin: AutoLinkPluginContext,
   editor: Editor,
-) {
-  if (plugin.undoStack.length === 0) return;
+): boolean {
+  if (plugin.undoStack.length === 0) return false;
 
   const lastAction = plugin.undoStack.pop();
-  if (!lastAction) return;
+  if (!lastAction) return false;
   editor.setLine(lastAction.line, lastAction.original);
   editor.setCursor(lastAction.cursor);
 
-  // We avoid importing Notice here to keep this file lightweight; caller may show notices if needed.
+  return true;
 }
 
 export function handleEditorChange(

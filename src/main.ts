@@ -1,4 +1,11 @@
-import { Plugin, Editor, MarkdownView, TFile, debounce } from "obsidian";
+import {
+  Plugin,
+  Editor,
+  MarkdownView,
+  TFile,
+  Notice,
+  debounce,
+} from "obsidian";
 import type { EventRef } from "obsidian";
 import {
   DEFAULT_SETTINGS,
@@ -93,53 +100,62 @@ export default class AutoLinkPlugin extends Plugin {
     const doc = window.activeDocument;
     if (doc) {
       this.registerDomEvent(doc, "keydown", (evt: KeyboardEvent) => {
+        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        const editor = activeView?.editor;
+
+        if (evt.ctrlKey && evt.shiftKey && evt.key === "Z") {
+          if (editor && this.undoStack.length > 0) {
+            evt.preventDefault();
+            temporarilyDisableAutoLink(this);
+            if (undoLastAutolink(this, editor)) {
+              new Notice("Auto-link undone");
+            }
+          }
+          return;
+        }
+
         if (
           (evt.key === "Backspace" || evt.key === "Delete") &&
-          this.undoStack.length > 0
+          this.undoStack.length > 0 &&
+          editor
         ) {
-          const activeView =
-            this.app.workspace.getActiveViewOfType(MarkdownView);
-          if (activeView?.editor) {
-            const cursor = activeView.editor.getCursor();
-            const lastUndo = this.undoStack[this.undoStack.length - 1];
+          const cursor = editor.getCursor();
+          const lastUndo = this.undoStack[this.undoStack.length - 1];
 
-            if (
-              lastUndo &&
-              cursor.line === lastUndo.line &&
-              lastUndo.linkText
-            ) {
-              const currentLine = activeView.editor.getLine(cursor.line);
+          if (lastUndo && cursor.line === lastUndo.line && lastUndo.linkText) {
+            const currentLine = editor.getLine(cursor.line);
 
-              const linkRegex = /\[\[([^|\]]+)(?:\|[^\]]+)?\]\]/g;
-              let match;
-              while ((match = linkRegex.exec(currentLine)) !== null) {
-                const baseText = match[1];
+            const linkRegex = /\[\[([^|\]]+)(?:\|[^\]]+)?\]\]/g;
+            let match;
+            while ((match = linkRegex.exec(currentLine)) !== null) {
+              const baseText = match[1];
 
-                if (baseText === lastUndo.linkText) {
-                  const linkStart = match.index;
-                  const linkEnd = linkStart + match[0].length;
+              if (baseText === lastUndo.linkText) {
+                const linkStart = match.index;
+                const linkEnd = linkStart + match[0].length;
 
-                  const isBackspaceNearLink =
-                    evt.key === "Backspace" &&
-                    cursor.ch > linkStart &&
-                    cursor.ch <= linkEnd;
-                  const isDeleteNearLink =
-                    evt.key === "Delete" &&
-                    cursor.ch >= linkStart &&
-                    cursor.ch < linkEnd;
+                const isBackspaceNearLink =
+                  evt.key === "Backspace" &&
+                  cursor.ch > linkStart &&
+                  cursor.ch <= linkEnd;
+                const isDeleteNearLink =
+                  evt.key === "Delete" &&
+                  cursor.ch >= linkStart &&
+                  cursor.ch < linkEnd;
 
-                  if (isBackspaceNearLink || isDeleteNearLink) {
-                    const timeSinceAutoLink =
-                      Date.now() - (lastUndo.timestamp || 0);
-                    const timeLimit = 30000; // 30 seconds
+                if (isBackspaceNearLink || isDeleteNearLink) {
+                  const timeSinceAutoLink =
+                    Date.now() - (lastUndo.timestamp || 0);
+                  const timeLimit = 30000; // 30 seconds
 
-                    if (!lastUndo.timestamp || timeSinceAutoLink <= timeLimit) {
-                      evt.preventDefault();
-                      temporarilyDisableAutoLink(this);
-                      undoLastAutolink(this, activeView.editor);
+                  if (!lastUndo.timestamp || timeSinceAutoLink <= timeLimit) {
+                    evt.preventDefault();
+                    temporarilyDisableAutoLink(this);
+                    if (undoLastAutolink(this, editor)) {
+                      new Notice("Auto-link undone");
                     }
-                    return;
                   }
+                  return;
                 }
               }
             }
@@ -155,7 +171,9 @@ export default class AutoLinkPlugin extends Plugin {
       editorCallback: (editor: Editor) => {
         if (this.undoStack.length > 0) {
           temporarilyDisableAutoLink(this);
-          undoLastAutolink(this, editor);
+          if (undoLastAutolink(this, editor)) {
+            new Notice("Auto-link undone");
+          }
         }
       },
     });

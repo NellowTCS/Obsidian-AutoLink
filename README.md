@@ -76,7 +76,7 @@ Provides full customization over when and how backlinks are created.
 
 ## Technical Details
 
-- Built with TypeScript and Svelte
+- Built with TypeScript
 - Debounced input processing for performance
 - Intelligent cursor positioning and conflict detection
 
