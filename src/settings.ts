@@ -7,13 +7,14 @@ import {
   MarkdownView,
   normalizePath,
 } from "obsidian";
-import type AutoLinkPlugin from "./main";
+import type { AutoLinkPluginContext } from "./types";
 import { updateNoteList } from "./notes";
 import { handleEditorChange } from "./editor";
 import type { Mode } from "./types";
+import type AutoLinkPlugin from "./main";
 
 export class AutoLinkSettingTab extends PluginSettingTab {
-  plugin: AutoLinkPlugin;
+  plugin: AutoLinkPluginContext;
 
   constructor(app: App, plugin: AutoLinkPlugin) {
     super(app, plugin);
@@ -121,9 +122,9 @@ export class AutoLinkSettingTab extends PluginSettingTab {
       new Setting(containerEl).setName("Custom mode").setHeading();
 
       new Setting(containerEl)
-        .setName("Allow Enter to accept suggestions")
+        .setName("Allow enter to accept suggestions")
         .setDesc(
-          "Whether the Enter key should accept suggestions in custom mode",
+          "Whether the enter key should accept suggestions in custom mode",
         )
         .addToggle((toggle) =>
           toggle
@@ -155,7 +156,7 @@ export class AutoLinkSettingTab extends PluginSettingTab {
         )
         .addTextArea((text) =>
           text
-            .setPlaceholder("folder1, folder2/subfolder, /")
+            .setPlaceholder("Folder1, folder2/subfolder, /")
             .setValue(this.plugin.settings.customFolders.join(", "))
             .onChange(async (value) => {
               // Normalize user-provided paths

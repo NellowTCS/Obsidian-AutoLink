@@ -1,70 +1,76 @@
 name: Build Obsidian plugin
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+    push:
+        branches:
+            - main
+    workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    build:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v3
 
-      - name: Use Node.js 18
-        uses: actions/setup-node@v3
-        with:
-          node-version: "18.x"
+            - name: Use Node.js 18
+              uses: actions/setup-node@v3
+              with:
+                  node-version: "18.x"
 
-      - name: Cache npm
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+            - name: Cache npm
+              uses: actions/cache@v4
+              with:
+                  path: ~/.npm
+                  key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+                  restore-keys: |
+                      ${{ runner.os }}-node-
 
-      - name: Install dependencies
-        run: npm i
+            - name: Install dependencies
+              run: npm i
 
-      - name: Build plugin
-        run: npm run build
+            - name: Build plugin
+              run: npm run build
 
-      - name: Collect dist/main.js and manifest.json
-        id: meta
-        run: |
-          set -euo pipefail
-          mkdir -p build-output
+            - name: Collect dist/main.js and manifest.json
+              id: meta
+              run: |
+                  set -euo pipefail
+                  mkdir -p build-output
 
-          # copy main.js -> build-output/main.js
-          if [ -f "main.js" ]; then
-            cp -v main.js build-output/main.js
-          else
-            echo "Error: main.js not found."
-            ls -la dist || true
-            exit 1
-          fi
+                  # copy dist/main.js
+                  if [ -f "dist/main.js" ]; then
+                    cp -v dist/main.js build-output/main.js
+                  else
+                    echo "Error: dist/main.js not found."
+                    ls -la dist || true
+                    exit 1
+                  fi
 
-          # copy manifest.json from repo root
-          if [ -f "manifest.json" ]; then
-            cp -v manifest.json build-output/manifest.json
-          else
-            echo "Error: manifest.json not found in repository root."
-            exit 2
-          fi
+                  # copy manifest.json from repo root
+                  if [ -f "manifest.json" ]; then
+                    cp -v manifest.json build-output/manifest.json
+                  else
+                    echo "Error: manifest.json not found in repository root."
+                    exit 2
+                  fi
 
-          echo "build-output contents:"
-          ls -la build-output
+                  # set outputs for artifact naming (requires jq, already in GitHub runners)
+                  PACKAGE_NAME=$(jq -r .name manifest.json)
+                  PACKAGE_VERSION=$(jq -r .version manifest.json)
+                  echo "package_name=${PACKAGE_NAME}" >> "$GITHUB_OUTPUT"
+                  echo "package_version=${PACKAGE_VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload artifact (main.js + manifest.json)
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.meta.outputs.package_name }}-${{ steps.meta.outputs.package_version }}-${{ github.run_id }}
-          path: |
-            build-output/main.js
-            build-output/manifest.json
+                  echo "build-output contents:"
+                  ls -la build-output
+
+            - name: Upload artifact (main.js + manifest.json)
+              uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ steps.meta.outputs.package_name }}-${{ steps.meta.outputs.package_version }}-${{ github.run_id }}
+                  path: |
+                      build-output/main.js
+                      build-output/manifest.json

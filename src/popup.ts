@@ -7,13 +7,14 @@ import {
   type EditorSuggestTriggerInfo,
   type EditorSuggestContext,
 } from "obsidian";
-import type AutoLinkPlugin from "./main";
+import type { AutoLinkPluginContext } from "./types";
 import { getBestMatch, acceptSuggestion, isInsideLink } from "./editor";
 import { findMatches } from "./notes";
 import type { NoteMatch } from "./types";
+import type AutoLinkPlugin from "./main";
 
 export class AutoLinkEditorSuggest extends EditorSuggest<NoteMatch> {
-  plugin: AutoLinkPlugin;
+  plugin: AutoLinkPluginContext;
 
   constructor(app: App, plugin: AutoLinkPlugin) {
     super(app);
@@ -88,7 +89,7 @@ export class AutoLinkEditorSuggest extends EditorSuggest<NoteMatch> {
       ? `${match.title} → ${match.file.basename}`
       : match.title;
 
-    el.createEl("div", {
+    el.createDiv({
       text: displayTitle,
       cls: "autolink-suggestion-title",
     });

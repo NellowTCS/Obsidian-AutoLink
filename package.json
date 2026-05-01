@@ -2,7 +2,7 @@
 	"name": "autolink",
 	"version": "1.0.2",
 	"description": "Automatically creates backlinks from and to notes with easy customizability.",
-	"main": "main.js",
+	"main": "dist/main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",

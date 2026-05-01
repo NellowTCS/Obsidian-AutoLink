@@ -1,21 +1,5 @@
-import {
-  Plugin,
-  Editor,
-  MarkdownView,
-  TFile,
-  Notice,
-  PluginSettingTab,
-  App,
-  Setting,
-  debounce,
-  normalizePath,
-  EditorSuggest,
-} from "obsidian";
-import type {
-  EditorPosition,
-  EditorSuggestContext,
-  EditorSuggestTriggerInfo,
-} from "obsidian";
+import { Plugin, Editor, MarkdownView, TFile, debounce } from "obsidian";
+import type { EventRef } from "obsidian";
 import {
   DEFAULT_SETTINGS,
   type AutoLinkSettings,
@@ -92,69 +76,81 @@ export default class AutoLinkPlugin extends Plugin {
         this.settings.debounceMs,
       );
 
+      const workspace = this.app.workspace as unknown as {
+        on(
+          name: string,
+          callback: (editor: Editor, view: MarkdownView) => void,
+        ): EventRef;
+      };
+
       this.registerEvent(
-        (this.app.workspace as any).on(
-          "editor-change",
-          (editor: Editor, view: MarkdownView) => {
-            this.handleEditorChangeDebounced(editor, view);
-          },
-        ),
+        workspace.on("editor-change", (editor: Editor, view: MarkdownView) => {
+          this.handleEditorChangeDebounced(editor, view);
+        }),
       );
     });
 
-    this.registerDomEvent(document, "keydown", (evt: KeyboardEvent) => {
-      if (
-        (evt.key === "Backspace" || evt.key === "Delete") &&
-        this.undoStack.length > 0
-      ) {
-        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (activeView?.editor) {
-          const cursor = activeView.editor.getCursor();
-          const lastUndo = this.undoStack[this.undoStack.length - 1];
+    const doc = window.activeDocument;
+    if (doc) {
+      this.registerDomEvent(doc, "keydown", (evt: KeyboardEvent) => {
+        if (
+          (evt.key === "Backspace" || evt.key === "Delete") &&
+          this.undoStack.length > 0
+        ) {
+          const activeView =
+            this.app.workspace.getActiveViewOfType(MarkdownView);
+          if (activeView?.editor) {
+            const cursor = activeView.editor.getCursor();
+            const lastUndo = this.undoStack[this.undoStack.length - 1];
 
-          if (lastUndo && cursor.line === lastUndo.line && lastUndo.linkText) {
-            const currentLine = activeView.editor.getLine(cursor.line);
+            if (
+              lastUndo &&
+              cursor.line === lastUndo.line &&
+              lastUndo.linkText
+            ) {
+              const currentLine = activeView.editor.getLine(cursor.line);
 
-            const linkRegex = /\[\[([^|\]]+)(?:\|[^\]]+)?\]\]/g;
-            let match;
-            while ((match = linkRegex.exec(currentLine)) !== null) {
-              const baseText = match[1];
+              const linkRegex = /\[\[([^|\]]+)(?:\|[^\]]+)?\]\]/g;
+              let match;
+              while ((match = linkRegex.exec(currentLine)) !== null) {
+                const baseText = match[1];
 
-              if (baseText === lastUndo.linkText) {
-                const linkStart = match.index;
-                const linkEnd = linkStart + match[0].length;
+                if (baseText === lastUndo.linkText) {
+                  const linkStart = match.index;
+                  const linkEnd = linkStart + match[0].length;
 
-                const isBackspaceNearLink =
-                  evt.key === "Backspace" &&
-                  cursor.ch > linkStart &&
-                  cursor.ch <= linkEnd;
-                const isDeleteNearLink =
-                  evt.key === "Delete" &&
-                  cursor.ch >= linkStart &&
-                  cursor.ch < linkEnd;
+                  const isBackspaceNearLink =
+                    evt.key === "Backspace" &&
+                    cursor.ch > linkStart &&
+                    cursor.ch <= linkEnd;
+                  const isDeleteNearLink =
+                    evt.key === "Delete" &&
+                    cursor.ch >= linkStart &&
+                    cursor.ch < linkEnd;
 
-                if (isBackspaceNearLink || isDeleteNearLink) {
-                  const timeSinceAutoLink =
-                    Date.now() - (lastUndo.timestamp || 0);
-                  const timeLimit = 30000; // 30 seconds
+                  if (isBackspaceNearLink || isDeleteNearLink) {
+                    const timeSinceAutoLink =
+                      Date.now() - (lastUndo.timestamp || 0);
+                    const timeLimit = 30000; // 30 seconds
 
-                  if (!lastUndo.timestamp || timeSinceAutoLink <= timeLimit) {
-                    evt.preventDefault();
-                    temporarilyDisableAutoLink(this);
-                    undoLastAutolink(this, activeView.editor);
+                    if (!lastUndo.timestamp || timeSinceAutoLink <= timeLimit) {
+                      evt.preventDefault();
+                      temporarilyDisableAutoLink(this);
+                      undoLastAutolink(this, activeView.editor);
+                    }
+                    return;
                   }
-                  return;
                 }
               }
             }
           }
         }
-      }
-    });
+      });
+    }
 
     // Add command for undo functionality
     this.addCommand({
-      id: "undo-autolink",
+      id: "undo-link",
       name: "Undo last auto-link",
       editorCallback: (editor: Editor) => {
         if (this.undoStack.length > 0) {
@@ -172,13 +168,15 @@ export default class AutoLinkPlugin extends Plugin {
   }
 
   onunload() {
-    if (this.disableTimeout) {
-      clearTimeout(this.disableTimeout);
+    const win = window.activeWindow;
+    if (this.disableTimeout && win) {
+      win.clearTimeout(this.disableTimeout);
     }
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const data = (await this.loadData()) as Partial<AutoLinkSettings>;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
   }
 
   async saveSettings() {

@@ -1,5 +1,5 @@
 import type { Editor, MarkdownView } from "obsidian";
-import type { NoteMatch } from "./types";
+import type { AutoLinkPluginContext, NoteMatch } from "./types";
 import { findMatches } from "./notes";
 
 export function isInsideLink(line: string, ch: number): boolean {
@@ -19,7 +19,7 @@ export function isInsideLink(line: string, ch: number): boolean {
 }
 
 export function getBestMatch(
-  plugin: any,
+  plugin: AutoLinkPluginContext,
   text: string,
   currentBasename: string,
 ) {
@@ -55,7 +55,7 @@ export function escapeRegex(str: string): string {
 }
 
 export function insertLinkForCompletedWord(
-  plugin: any,
+  plugin: AutoLinkPluginContext,
   editor: Editor,
   completedWord: string,
   match: NoteMatch,
@@ -96,7 +96,7 @@ export function insertLinkForCompletedWord(
 }
 
 export function handleAutonomousMode(
-  plugin: any,
+  plugin: AutoLinkPluginContext,
   editor: Editor,
   typed: string,
   matches: NoteMatch[],
@@ -136,7 +136,7 @@ export function handleAutonomousMode(
 }
 
 export function acceptSuggestion(
-  plugin: any,
+  plugin: AutoLinkPluginContext,
   editor: Editor,
   match: NoteMatch,
   typed: string,
@@ -180,18 +180,25 @@ export function acceptSuggestion(
   if (plugin.undoStack.length > 10) plugin.undoStack.shift();
 }
 
-export function temporarilyDisableAutoLink(plugin: any) {
+export function temporarilyDisableAutoLink(plugin: AutoLinkPluginContext) {
   plugin.isAutoLinkDisabled = true;
 
-  if (plugin.disableTimeout) clearTimeout(plugin.disableTimeout);
+  const win = window.activeWindow;
+  if (plugin.disableTimeout && win) {
+    win.clearTimeout(plugin.disableTimeout);
+  }
 
-  plugin.disableTimeout = window.setTimeout(() => {
-    plugin.isAutoLinkDisabled = false;
-    plugin.disableTimeout = null;
-  }, 1000);
+  plugin.disableTimeout =
+    win?.setTimeout(() => {
+      plugin.isAutoLinkDisabled = false;
+      plugin.disableTimeout = null;
+    }, 1000) ?? null;
 }
 
-export function undoLastAutolink(plugin: any, editor: Editor) {
+export function undoLastAutolink(
+  plugin: AutoLinkPluginContext,
+  editor: Editor,
+) {
   if (plugin.undoStack.length === 0) return;
 
   const lastAction = plugin.undoStack.pop();
@@ -203,7 +210,7 @@ export function undoLastAutolink(plugin: any, editor: Editor) {
 }
 
 export function handleEditorChange(
-  plugin: any,
+  plugin: AutoLinkPluginContext,
   editor: Editor,
   view: MarkdownView,
 ) {

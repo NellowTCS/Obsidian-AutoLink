@@ -1,7 +1,7 @@
 import type { TFile } from "obsidian";
-import type { AutoLinkSettings, NoteMatch } from "./types";
+import type { AutoLinkPluginContext, NoteMatch } from "./types";
 
-export function updateNoteList(plugin: any) {
+export function updateNoteList(plugin: AutoLinkPluginContext) {
   plugin.noteTitles.clear();
   plugin.aliases.clear();
 
@@ -34,7 +34,7 @@ export function updateNoteList(plugin: any) {
   });
 }
 
-export function getRelevantFiles(plugin: any): TFile[] {
+export function getRelevantFiles(plugin: AutoLinkPluginContext): TFile[] {
   const allFiles = plugin.app.vault.getMarkdownFiles();
 
   if (plugin.settings.mode === "semiAutonomous") {
@@ -60,7 +60,7 @@ export function getRelevantFiles(plugin: any): TFile[] {
 }
 
 export function findMatches(
-  plugin: any,
+  plugin: AutoLinkPluginContext,
   typed: string,
   currentBasename: string,
 ): NoteMatch[] {
