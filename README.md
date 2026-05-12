@@ -4,7 +4,8 @@
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/NellowTCS/Obsidian-AutoLink/release.yml) ![GitHub License](https://img.shields.io/github/license/NellowTCS/Obsidian-Autolink) 
  
 
-Automatically creates backlinks between your notes with intelligent word completion and customizable behavior.
+Automatically creates backlinks between your notes with intelligent word completion and customizable behavior.  
+Available on [Obsidian](https://community.obsidian.md/plugins/autolink)!
 
 ## Features
 
@@ -72,7 +73,34 @@ Provides full customization over when and how backlinks are created.
 
 ## Installation
 
-(WIP)
+### Direct (Recommended)
+
+You can install **Autolink** directly from Obsidian’s Community Plugins browser (or online [here](https://community.obsidian.md/plugins/autolink)).
+
+1. Open **Settings -> Community Plugins**  
+2. Make sure **Restricted Mode** is off  
+3. Click **Browse**  
+4. Search for **“Autolink”**  
+5. Click **Install**, then **Enable**
+
+### Manual
+
+If you prefer installing manually:
+
+1. Download the latest release from the repo’s **Releases** page  
+   - You need:  
+     - `main.js`  
+     - `manifest.json`  
+     - `styles.css` (if present)
+2. Create a folder in your vault:  
+   ```
+   .obsidian/plugins/autolink
+   ```
+3. Place all downloaded files inside that folder  
+4. Restart Obsidian  
+5. Go to **Settings -> Community Plugins** and enable **Autolink**
+
+### Install 
 
 ## Technical Details
 
