@@ -1,11 +1,12 @@
 import type { TFile } from "obsidian";
 import type { AutoLinkPluginContext, NoteMatch } from "./types";
 
-// Hilfsfunktion zur Normalisierung von Umlauten und diakritischen Zeichen
+// Helper function for normalizing umlauts and diacritics
 const normalizeString = (str: string): string => {
   return str
-    .normalize("NFD") // Zerlegt Umlaute in Basisbuchstaben + diakritische Zeichen
-    .replace(/[\u0300-\u036f]/g, "") // Entfernt diakritische Zeichen
+    .normalize("NFD") // Decomposes umlauts into base letters + diacritics
+    .replace(/[\u0300-\u036f]/g, "") // Removes diacritics
+    .replace(/ß/g, "ss") // Replaces sharp S with ss
     .toLowerCase();
 };
 
@@ -75,7 +76,6 @@ export function findMatches(
   const searchKey = plugin.settings.caseSensitive
     ? typed
     : normalizeString(typed);
-
   const normalizedCurrentBasename = plugin.settings.caseSensitive
     ? currentBasename
     : normalizeString(currentBasename);
