@@ -1,14 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-// We need to test the normalizeString function internally
-// Since it's not exported, we'll recreate it here for testing
-const normalizeString = (str: string): string => {
-  return str
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/ß/g, "ss")
-    .toLowerCase();
-};
+import { normalizeString } from "../notes";
 
 describe("normalizeString", () => {
   describe("Basic German Umlauts", () => {

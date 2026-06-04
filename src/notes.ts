@@ -2,7 +2,7 @@ import type { TFile } from "obsidian";
 import type { AutoLinkPluginContext, NoteMatch } from "./types";
 
 // Helper function for normalizing umlauts and diacritics
-const normalizeString = (str: string): string => {
+export const normalizeString = (str: string): string => {
   return str
     .normalize("NFD") // Decomposes umlauts into base letters + diacritics
     .replace(/[\u0300-\u036f]/g, "") // Removes diacritics

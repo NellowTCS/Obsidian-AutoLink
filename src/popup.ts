@@ -50,7 +50,7 @@ export class AutoLinkEditorSuggest extends EditorSuggest<NoteMatch> {
 
     const beforeCursor = processedLine.slice(0, processedCh);
     // Use Unicode-aware regex to match letters including umlauts (ä, ö, ü, ß)
-    const match = beforeCursor.match(/[\p{L}\s\-_]+$/u);
+    const match = beforeCursor.match(/[\p{L}\p{N}\s\-_]+$/u);
     if (!match) return null;
 
     const currentBasename = file?.basename || "";

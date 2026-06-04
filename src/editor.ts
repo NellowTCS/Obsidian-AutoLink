@@ -235,7 +235,7 @@ export function handleEditorChange(
 
   const beforeCursor = processedLine.slice(0, processedCursorCh);
   // Use Unicode-aware regex to match letters including umlauts (ä, ö, ü, ß)
-  const match = beforeCursor.match(/[\p{L}\s\-_]+$/u);
+  const match = beforeCursor.match(/[\p{L}\p{N}\s\-_]+$/u);
   if (!match) {
     plugin.pendingMatches.clear();
     return;
@@ -267,7 +267,7 @@ export function handleEditorChange(
     isWordCompleting
   ) {
     const beforeDelimiter = processedLine.slice(0, processedCursorCh - 1);
-    const wordMatch = beforeDelimiter.match(/[\p{L}\s\-_]+$/u);
+    const wordMatch = beforeDelimiter.match(/[\p{L}\p{N}\s\-_]+$/u);
 
     if (wordMatch) {
       const completedBestMatch = getBestMatch(
