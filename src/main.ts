@@ -45,11 +45,10 @@ export default class AutoLinkPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
-    // Build initial note and alias lists
-    updateNoteList(this);
-
-    // Wait for layout ready before registering events so we don't re-run on startup passes
+    // Wait for layout ready before building note lists so vault is fully loaded
     this.app.workspace.onLayoutReady(() => {
+      // Build initial note and alias lists
+      updateNoteList(this);
       // Vault events
       this.registerEvent(
         this.app.vault.on("create", (file) => {

@@ -59,9 +59,10 @@ export function getRelevantFiles(plugin: AutoLinkPluginContext): TFile[] {
     plugin.settings.customFolders.length > 0
   ) {
     return allFiles.filter((file: TFile) => {
-      return plugin.settings.customFolders.some((folder: string) =>
-        file.path.startsWith(folder === "/" ? "" : folder + "/"),
-      );
+      return plugin.settings.customFolders.some((folder: string) => {
+        if (folder === "/") return true;
+        return file.path.startsWith(folder + "/");
+      });
     });
   }
 
