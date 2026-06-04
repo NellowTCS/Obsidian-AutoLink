@@ -1,6 +1,14 @@
 import type { TFile } from "obsidian";
 import type { AutoLinkPluginContext, NoteMatch } from "./types";
 
+// Hilfsfunktion zur Normalisierung von Umlauten und diakritischen Zeichen
+const normalizeString = (str: string): string => {
+  return str
+    .normalize("NFD") // Zerlegt Umlaute in Basisbuchstaben + diakritische Zeichen
+    .replace(/[\u0300-\u036f]/g, "") // Entfernt diakritische Zeichen
+    .toLowerCase();
+};
+
 export function updateNoteList(plugin: AutoLinkPluginContext) {
   plugin.noteTitles.clear();
   plugin.aliases.clear();
@@ -9,10 +17,10 @@ export function updateNoteList(plugin: AutoLinkPluginContext) {
 
   files.forEach((file: TFile) => {
     const basename = file.basename;
-    plugin.noteTitles.set(
-      plugin.settings.caseSensitive ? basename : basename.toLowerCase(),
-      file,
-    );
+    const key = plugin.settings.caseSensitive
+      ? basename
+      : normalizeString(basename);
+    plugin.noteTitles.set(key, file);
 
     if (plugin.settings.includeAliases) {
       const cache = plugin.app.metadataCache.getFileCache(file);
@@ -23,10 +31,10 @@ export function updateNoteList(plugin: AutoLinkPluginContext) {
 
         aliases.forEach((alias: string) => {
           if (typeof alias === "string" && alias.trim()) {
-            const key = plugin.settings.caseSensitive
+            const aliasKey = plugin.settings.caseSensitive
               ? alias
-              : alias.toLowerCase();
-            plugin.aliases.set(key, file);
+              : normalizeString(alias);
+            plugin.aliases.set(aliasKey, file);
           }
         });
       }
@@ -64,17 +72,18 @@ export function findMatches(
   typed: string,
   currentBasename: string,
 ): NoteMatch[] {
-  const searchKey = plugin.settings.caseSensitive ? typed : typed.toLowerCase();
+  const searchKey = plugin.settings.caseSensitive
+    ? typed
+    : normalizeString(typed);
+
+  const normalizedCurrentBasename = plugin.settings.caseSensitive
+    ? currentBasename
+    : normalizeString(currentBasename);
+
   const matches: NoteMatch[] = [];
 
   for (const [title, file] of plugin.noteTitles.entries()) {
-    if (
-      title !==
-        (plugin.settings.caseSensitive
-          ? currentBasename
-          : currentBasename.toLowerCase()) &&
-      title.startsWith(searchKey)
-    ) {
+    if (title !== normalizedCurrentBasename && title.startsWith(searchKey)) {
       matches.push({ title: file.basename, file, isAlias: false });
     }
   }
