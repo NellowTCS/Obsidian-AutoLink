@@ -1,6 +1,15 @@
 import type { TFile } from "obsidian";
 import type { AutoLinkPluginContext, NoteMatch } from "./types";
 
+// Helper function for normalizing umlauts and diacritics
+export const normalizeString = (str: string): string => {
+  return str
+    .normalize("NFD") // Decomposes umlauts into base letters + diacritics
+    .replace(/[\u0300-\u036f]/g, "") // Removes diacritics
+    .replace(/ß/g, "ss") // Replaces sharp S with ss
+    .toLowerCase();
+};
+
 export function updateNoteList(plugin: AutoLinkPluginContext) {
   plugin.noteTitles.clear();
   plugin.aliases.clear();
@@ -9,10 +18,10 @@ export function updateNoteList(plugin: AutoLinkPluginContext) {
 
   files.forEach((file: TFile) => {
     const basename = file.basename;
-    plugin.noteTitles.set(
-      plugin.settings.caseSensitive ? basename : basename.toLowerCase(),
-      file,
-    );
+    const key = plugin.settings.caseSensitive
+      ? basename
+      : normalizeString(basename);
+    plugin.noteTitles.set(key, file);
 
     if (plugin.settings.includeAliases) {
       const cache = plugin.app.metadataCache.getFileCache(file);
@@ -23,10 +32,10 @@ export function updateNoteList(plugin: AutoLinkPluginContext) {
 
         aliases.forEach((alias: string) => {
           if (typeof alias === "string" && alias.trim()) {
-            const key = plugin.settings.caseSensitive
+            const aliasKey = plugin.settings.caseSensitive
               ? alias
-              : alias.toLowerCase();
-            plugin.aliases.set(key, file);
+              : normalizeString(alias);
+            plugin.aliases.set(aliasKey, file);
           }
         });
       }
@@ -50,9 +59,10 @@ export function getRelevantFiles(plugin: AutoLinkPluginContext): TFile[] {
     plugin.settings.customFolders.length > 0
   ) {
     return allFiles.filter((file: TFile) => {
-      return plugin.settings.customFolders.some((folder: string) =>
-        file.path.startsWith(folder === "/" ? "" : folder + "/"),
-      );
+      return plugin.settings.customFolders.some((folder: string) => {
+        if (folder === "/") return true;
+        return file.path.startsWith(folder + "/");
+      });
     });
   }
 
@@ -64,17 +74,17 @@ export function findMatches(
   typed: string,
   currentBasename: string,
 ): NoteMatch[] {
-  const searchKey = plugin.settings.caseSensitive ? typed : typed.toLowerCase();
+  const searchKey = plugin.settings.caseSensitive
+    ? typed
+    : normalizeString(typed);
+  const normalizedCurrentBasename = plugin.settings.caseSensitive
+    ? currentBasename
+    : normalizeString(currentBasename);
+
   const matches: NoteMatch[] = [];
 
   for (const [title, file] of plugin.noteTitles.entries()) {
-    if (
-      title !==
-        (plugin.settings.caseSensitive
-          ? currentBasename
-          : currentBasename.toLowerCase()) &&
-      title.startsWith(searchKey)
-    ) {
+    if (title !== normalizedCurrentBasename && title.startsWith(searchKey)) {
       matches.push({ title: file.basename, file, isAlias: false });
     }
   }

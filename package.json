@@ -8,7 +8,10 @@
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"lint": "eslint \"src/**/*.{ts,js}\"",
-		"make-pretty": "prettier --write \"src/**/*.{ts,js,json,md}\""
+		"make-pretty": "prettier --write \"src/**/*.{ts,js,json,md}\"",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
 	},
 	"keywords": [],
 	"author": "",
@@ -18,6 +21,7 @@
 		"@types/node": "^25.6.0",
 		"@typescript-eslint/eslint-plugin": "8.59.1",
 		"@typescript-eslint/parser": "^8.59.1",
+		"@vitest/coverage-v8": "^4.1.8",
 		"builtin-modules": "5.1.0",
 		"esbuild": "0.28.0",
 		"eslint": "^10.2.1",
@@ -25,6 +29,7 @@
 		"obsidian": "1.12.3",
 		"prettier": "^3.8.3",
 		"tslib": "2.8.1",
-		"typescript": "6.0.3"
+		"typescript": "6.0.3",
+		"vitest": "^4.1.8"
 	}
 }

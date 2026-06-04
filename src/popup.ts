@@ -49,7 +49,8 @@ export class AutoLinkEditorSuggest extends EditorSuggest<NoteMatch> {
     if (isInsideLink(processedLine, processedCh)) return null;
 
     const beforeCursor = processedLine.slice(0, processedCh);
-    const match = beforeCursor.match(/[\w\s\-_]+$/);
+    // Use Unicode-aware regex to match letters including umlauts (ä, ö, ü, ß)
+    const match = beforeCursor.match(/[\p{L}\p{N}\s\-_]+$/u);
     if (!match) return null;
 
     const currentBasename = file?.basename || "";
