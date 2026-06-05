@@ -21,6 +21,156 @@ export class AutoLinkSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
+  // 1.13.0+: Obsidian calls this and skips display().
+  // Controls auto-bind to this.plugin.settings[key].
+  getSettingDefinitions() {
+    return [
+      {
+        name: "Mode",
+        desc: "Choose how auto-linking behaves",
+        render: (setting: Setting) => {
+          setting.addDropdown((dropdown) =>
+            dropdown
+              .addOption("autonomous", "Autonomous - auto-link all notes")
+              .addOption(
+                "semiAutonomous",
+                "Semi-autonomous - only current folder",
+              )
+              .addOption(
+                "suggestions",
+                "Suggestions - show popup for confirmation",
+              )
+              .addOption("custom", "Custom - use custom settings")
+              .setValue(this.plugin.settings.mode)
+              .onChange(async (value) => {
+                this.plugin.settings.mode = value as Mode;
+                await this.plugin.saveSettings();
+                updateNoteList(this.plugin);
+                this.update();
+              }),
+          );
+        },
+      },
+      {
+        name: "Minimum word length",
+        desc: "Minimum number of characters before auto-linking kicks in",
+        control: {
+          type: "slider" as const,
+          key: "minWordLength",
+          min: 1,
+          max: 10,
+          step: 1,
+        },
+      },
+      {
+        name: "Case-sensitive matching",
+        desc: "Whether to match note titles case-sensitively",
+        render: (setting: Setting) => {
+          setting.addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.caseSensitive)
+              .onChange(async (value) => {
+                this.plugin.settings.caseSensitive = value;
+                await this.plugin.saveSettings();
+                updateNoteList(this.plugin);
+              }),
+          );
+        },
+      },
+      {
+        name: "Include aliases",
+        desc: "Also match against note aliases from frontmatter",
+        render: (setting: Setting) => {
+          setting.addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.includeAliases)
+              .onChange(async (value) => {
+                this.plugin.settings.includeAliases = value;
+                await this.plugin.saveSettings();
+                updateNoteList(this.plugin);
+              }),
+          );
+        },
+      },
+      {
+        name: "Debounce delay (ms)",
+        desc: "How long to wait after typing stops before processing",
+        render: (setting: Setting) => {
+          setting.addSlider((slider) =>
+            slider
+              .setLimits(50, 1000, 50)
+              .setValue(this.plugin.settings.debounceMs)
+              .setDynamicTooltip()
+              .onChange(async (value) => {
+                this.plugin.settings.debounceMs = value;
+                await this.plugin.saveSettings();
+                this.plugin.handleEditorChangeDebounced = debounce(
+                  (editor: Editor, view: MarkdownView) => {
+                    handleEditorChange(this.plugin, editor, view);
+                  },
+                  this.plugin.settings.debounceMs,
+                );
+              }),
+          );
+        },
+      },
+      {
+        name: "Max suggestions",
+        desc: "Maximum number of suggestions to show in popup mode",
+        control: {
+          type: "slider" as const,
+          key: "maxSuggestions",
+          min: 1,
+          max: 20,
+          step: 1,
+        },
+      },
+      {
+        name: "Custom mode",
+        render: (setting: Setting) => {
+          setting.setHeading();
+        },
+        visible: () => this.plugin.settings.mode === "custom",
+      },
+      {
+        name: "Allow enter to accept suggestions",
+        desc: "Whether the enter key should accept suggestions in custom mode",
+        control: { type: "toggle" as const, key: "customAllowEnterAccept" },
+        visible: () => this.plugin.settings.mode === "custom",
+      },
+      {
+        name: "Auto-insert single matches",
+        desc: "Automatically insert links when there's only one matching note",
+        control: {
+          type: "toggle" as const,
+          key: "customAutoInsertSingleMatch",
+        },
+        visible: () => this.plugin.settings.mode === "custom",
+      },
+      {
+        name: "Custom folders",
+        desc: "Comma-separated list of folders to include in custom mode (use / for root)",
+        render: (setting: Setting) => {
+          setting.addTextArea((text) =>
+            text
+              .setPlaceholder("Folder1, folder2/subfolder, /")
+              .setValue(this.plugin.settings.customFolders.join(", "))
+              .onChange(async (value) => {
+                this.plugin.settings.customFolders = value
+                  .split(",")
+                  .map((f) => normalizePath(f.trim()))
+                  .filter((f) => f.length > 0);
+                await this.plugin.saveSettings();
+                updateNoteList(this.plugin);
+              }),
+          );
+        },
+        visible: () => this.plugin.settings.mode === "custom",
+      },
+    ];
+  }
+
+  // < 1.13.0: Obsidian calls this. Keep for older Obsidian versions.
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
@@ -94,7 +244,6 @@ export class AutoLinkSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.debounceMs = value;
             await this.plugin.saveSettings();
-            // recreate debounced handler with new delay if workspace is ready
             this.plugin.handleEditorChangeDebounced = debounce(
               (editor: Editor, view: MarkdownView) => {
                 handleEditorChange(this.plugin, editor, view);
@@ -159,7 +308,6 @@ export class AutoLinkSettingTab extends PluginSettingTab {
             .setPlaceholder("Folder1, folder2/subfolder, /")
             .setValue(this.plugin.settings.customFolders.join(", "))
             .onChange(async (value) => {
-              // Normalize user-provided paths
               this.plugin.settings.customFolders = value
                 .split(",")
                 .map((f) => normalizePath(f.trim()))
