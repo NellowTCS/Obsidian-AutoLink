@@ -28,27 +28,16 @@ export class AutoLinkSettingTab extends PluginSettingTab {
       {
         name: "Mode",
         desc: "Choose how auto-linking behaves",
-        render: (setting: Setting) => {
-          setting.addDropdown((dropdown) =>
-            dropdown
-              .addOption("autonomous", "Autonomous - auto-link all notes")
-              .addOption(
-                "semiAutonomous",
-                "Semi-autonomous - only current folder",
-              )
-              .addOption(
-                "suggestions",
-                "Suggestions - show popup for confirmation",
-              )
-              .addOption("custom", "Custom - use custom settings")
-              .setValue(this.plugin.settings.mode)
-              .onChange(async (value) => {
-                this.plugin.settings.mode = value as Mode;
-                await this.plugin.saveSettings();
-                updateNoteList(this.plugin);
-                this.update();
-              }),
-          );
+        control: {
+          type: "dropdown" as const,
+          key: "mode",
+          defaultValue: "autonomous",
+          options: {
+            autonomous: "Autonomous - auto-link all notes",
+            semiAutonomous: "Semi-autonomous - only current folder",
+            suggestions: "Suggestions - show popup for confirmation",
+            custom: "Custom - use custom settings",
+          },
         },
       },
       {
@@ -100,7 +89,6 @@ export class AutoLinkSettingTab extends PluginSettingTab {
             slider
               .setLimits(50, 1000, 50)
               .setValue(this.plugin.settings.debounceMs)
-              .setDynamicTooltip()
               .onChange(async (value) => {
                 this.plugin.settings.debounceMs = value;
                 await this.plugin.saveSettings();
@@ -170,8 +158,20 @@ export class AutoLinkSettingTab extends PluginSettingTab {
     ];
   }
 
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    (this.plugin.settings as unknown as Record<string, unknown>)[key] = value;
+    await this.plugin.saveSettings();
+    if (key === "mode") {
+      updateNoteList(this.plugin);
+    }
+  }
+
   // < 1.13.0: Obsidian calls this. Keep for older Obsidian versions.
   display(): void {
+    this.renderLegacy();
+  }
+
+  private renderLegacy(): void {
     const { containerEl } = this;
     containerEl.empty();
 
@@ -189,7 +189,7 @@ export class AutoLinkSettingTab extends PluginSettingTab {
             this.plugin.settings.mode = value as Mode;
             await this.plugin.saveSettings();
             updateNoteList(this.plugin);
-            this.display();
+            this.renderLegacy();
           }),
       );
 
@@ -200,7 +200,6 @@ export class AutoLinkSettingTab extends PluginSettingTab {
         slider
           .setLimits(1, 10, 1)
           .setValue(this.plugin.settings.minWordLength)
-          .setDynamicTooltip()
           .onChange(async (value) => {
             this.plugin.settings.minWordLength = value;
             await this.plugin.saveSettings();
@@ -240,7 +239,6 @@ export class AutoLinkSettingTab extends PluginSettingTab {
         slider
           .setLimits(50, 1000, 50)
           .setValue(this.plugin.settings.debounceMs)
-          .setDynamicTooltip()
           .onChange(async (value) => {
             this.plugin.settings.debounceMs = value;
             await this.plugin.saveSettings();
@@ -260,7 +258,6 @@ export class AutoLinkSettingTab extends PluginSettingTab {
         slider
           .setLimits(1, 20, 1)
           .setValue(this.plugin.settings.maxSuggestions)
-          .setDynamicTooltip()
           .onChange(async (value) => {
             this.plugin.settings.maxSuggestions = value;
             await this.plugin.saveSettings();
