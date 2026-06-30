@@ -18,7 +18,7 @@
 	"license": "MIT",
 	"devDependencies": {
 		"@types/jquery": "^4.0.1",
-		"@types/node": "^25.9.1",
+		"@types/node": "^26.0.1",
 		"@typescript-eslint/eslint-plugin": "8.61.1",
 		"@typescript-eslint/parser": "^8.62.1",
 		"@vitest/coverage-v8": "^4.1.8",
