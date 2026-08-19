@@ -26,6 +26,14 @@ describe("findMatches", () => {
       expect(matches.map((m) => m.title)).toEqual(["Note"]);
     });
 
+    it("returns nothing when the typed text is the current note's title", () => {
+      const plugin = makePluginContext(
+        {},
+        [{ basename: "Note" }, { basename: "Current" }],
+      );
+      expect(findMatches(plugin, "Current", "Current")).toEqual([]);
+    });
+
     it("returns an empty array when nothing matches", () => {
       const plugin = makePluginContext({}, [{ basename: "Note" }]);
       expect(findMatches(plugin, "Zzz", "Current")).toEqual([]);

@@ -16,6 +16,9 @@
 	"keywords": [],
 	"author": "",
 	"license": "MIT",
+	"engines": {
+		"node": ">=22"
+	},
 	"devDependencies": {
 		"@types/jquery": "^4.0.1",
 		"@types/node": "^26.2.0",
