@@ -35,6 +35,15 @@
         "code",
         "test"
       ]
+    },
+    {
+      "login": "Ansraer",
+      "name": "Ansraer",
+      "avatar_url": "https://avatars.githubusercontent.com/u/6329420?v=4",
+      "profile": "https://github.com/Ansraer",
+      "contributions": [
+        "bug"
+      ]
     }
   ]
 }
