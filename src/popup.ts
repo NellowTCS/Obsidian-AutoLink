@@ -10,9 +10,11 @@ import {
 import type { AutoLinkPluginContext } from "./types";
 import { getBestMatch, acceptSuggestion, isInsideLink } from "./editor";
 import { findMatches } from "./notes";
+import { filterMatchesUnderLinkLimit } from "./limits";
 import type { NoteMatch } from "./types";
 import type AutoLinkPlugin from "./main";
 
+/** Offers uncapped note-title and alias matches through Obsidian's editor popup. */
 export class AutoLinkEditorSuggest extends EditorSuggest<NoteMatch> {
   plugin: AutoLinkPluginContext;
 
@@ -30,7 +32,7 @@ export class AutoLinkEditorSuggest extends EditorSuggest<NoteMatch> {
   onTrigger(
     cursor: EditorPosition,
     editor: Editor,
-    file: TFile,
+    file: TFile | null,
   ): EditorSuggestTriggerInfo | null {
     const mode = this.plugin.settings.mode;
 
@@ -54,7 +56,12 @@ export class AutoLinkEditorSuggest extends EditorSuggest<NoteMatch> {
     if (!match) return null;
 
     const currentBasename = file?.basename || "";
-    const bestMatch = getBestMatch(this.plugin, match[0], currentBasename);
+    const bestMatch = getBestMatch(
+      this.plugin,
+      match[0],
+      currentBasename,
+      Infinity,
+    );
     const typed = bestMatch.term;
 
     if (typed.length < this.plugin.settings.minWordLength) return null;
@@ -70,6 +77,13 @@ export class AutoLinkEditorSuggest extends EditorSuggest<NoteMatch> {
       return null;
     }
 
+    const available = filterMatchesUnderLinkLimit(
+      this.plugin,
+      editor,
+      bestMatch.matches,
+    );
+    if (available.length === 0) return null;
+
     const typedStart = beforeCursor.lastIndexOf(typed);
 
     return {
@@ -80,9 +94,18 @@ export class AutoLinkEditorSuggest extends EditorSuggest<NoteMatch> {
   }
 
   getSuggestions(context: EditorSuggestContext): NoteMatch[] {
-    const activeFile = this.app.workspace.getActiveFile();
-    const currentBasename = activeFile?.basename || "";
-    return findMatches(this.plugin, context.query, currentBasename);
+    const currentBasename = context.file?.basename || "";
+    const matches = findMatches(
+      this.plugin,
+      context.query,
+      currentBasename,
+      Infinity,
+    );
+    return filterMatchesUnderLinkLimit(
+      this.plugin,
+      context.editor,
+      matches,
+    ).slice(0, this.plugin.settings.maxSuggestions);
   }
 
   renderSuggestion(match: NoteMatch, el: HTMLElement): void {

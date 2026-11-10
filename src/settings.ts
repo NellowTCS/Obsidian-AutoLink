@@ -6,6 +6,7 @@ import {
   Editor,
   MarkdownView,
   normalizePath,
+  type SettingDefinition,
 } from "obsidian";
 import type { AutoLinkPluginContext } from "./types";
 import { updateNoteList } from "./notes";
@@ -25,7 +26,7 @@ export class AutoLinkSettingTab extends PluginSettingTab {
   // Settings bind to this.plugin.settings[key] via `control`, and side effects
   // run through setControlValue(). No 1.13+ API is invoked here so the plugin
   // stays installable on Obsidian < 1.13.0 (where this method is never called).
-  getSettingDefinitions() {
+  getSettingDefinitions(): SettingDefinition[] {
     return [
       {
         name: "Mode",
@@ -86,6 +87,27 @@ export class AutoLinkSettingTab extends PluginSettingTab {
         },
       },
       {
+        name: "Max links per note",
+        desc: "Maximum links to the same note (0 = unlimited)",
+        control: {
+          type: "slider" as const,
+          key: "maxLinksPerNote",
+          min: 0,
+          max: 10,
+          step: 1,
+        },
+      },
+      {
+        name: "Link limit scope",
+        desc: "Count links across the whole note or within the current heading section",
+        control: {
+          type: "dropdown" as const,
+          key: "maxLinksScope",
+          defaultValue: "note",
+          options: { note: "Whole note", section: "Per section" },
+        },
+      },
+      {
         name: "Custom mode",
         render: (setting: Setting) => {
           setting.setHeading();
@@ -120,7 +142,23 @@ export class AutoLinkSettingTab extends PluginSettingTab {
   // Centralizes side effects so getSettingDefinitions() stays free of 1.13+ API
   // calls. customFolders is an array in settings but a comma string in the UI.
   async setControlValue(key: string, value: unknown): Promise<void> {
-    if (key === "customFolders" && typeof value === "string") {
+    if (key === "maxLinksPerNote") {
+      if (
+        typeof value !== "number" ||
+        !Number.isSafeInteger(value) ||
+        value < 0
+      ) {
+        throw new RangeError(
+          "Max links per note must be a nonnegative integer",
+        );
+      }
+      this.plugin.settings.maxLinksPerNote = value;
+    } else if (key === "maxLinksScope") {
+      if (value !== "note" && value !== "section") {
+        throw new RangeError('Link limit scope must be "note" or "section"');
+      }
+      this.plugin.settings.maxLinksScope = value;
+    } else if (key === "customFolders" && typeof value === "string") {
       this.plugin.settings.customFolders = value
         .split(",")
         .map((f) => normalizePath(f.trim()))
@@ -245,6 +283,33 @@ export class AutoLinkSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.maxSuggestions = value;
             await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Max links per note")
+      .setDesc("Maximum links to the same note (0 = unlimited)")
+      .addSlider((slider) =>
+        slider
+          .setLimits(0, 10, 1)
+          .setValue(this.plugin.settings.maxLinksPerNote)
+          .onChange(async (value) => {
+            await this.setControlValue("maxLinksPerNote", value);
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Link limit scope")
+      .setDesc(
+        "Count links across the whole note or within the current heading section",
+      )
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("note", "Whole note")
+          .addOption("section", "Per section")
+          .setValue(this.plugin.settings.maxLinksScope)
+          .onChange(async (value) => {
+            await this.setControlValue("maxLinksScope", value);
           }),
       );
 

@@ -73,6 +73,7 @@ export function findMatches(
   plugin: AutoLinkPluginContext,
   typed: string,
   currentBasename: string,
+  maxSuggestions: number = plugin.settings.maxSuggestions,
 ): NoteMatch[] {
   const searchKey = plugin.settings.caseSensitive
     ? typed
@@ -97,5 +98,5 @@ export function findMatches(
     }
   }
 
-  return matches.slice(0, plugin.settings.maxSuggestions);
+  return matches.slice(0, maxSuggestions);
 }
