@@ -1,6 +1,7 @@
 import type { Editor, MarkdownView } from "obsidian";
 import type { AutoLinkPluginContext, NoteMatch } from "./types";
 import { findMatches } from "./notes";
+import { isUnderLinkLimit } from "./limits";
 
 export function isInsideLink(line: string, ch: number): boolean {
   const beforeCursor = line.slice(0, ch);
@@ -22,6 +23,7 @@ export function getBestMatch(
   plugin: AutoLinkPluginContext,
   text: string,
   currentBasename: string,
+  maxSuggestions: number = plugin.settings.maxSuggestions,
 ) {
   let candidate = text;
   const maxIterations = 10;
@@ -30,7 +32,12 @@ export function getBestMatch(
   while (candidate.length > 0 && iterations < maxIterations) {
     const trimmed = candidate.trim();
     if (trimmed.length >= plugin.settings.minWordLength) {
-      const matches = findMatches(plugin, trimmed, currentBasename);
+      const matches = findMatches(
+        plugin,
+        trimmed,
+        currentBasename,
+        maxSuggestions,
+      );
       if (matches.length > 0) {
         return { term: trimmed, matches };
       }
@@ -62,6 +69,8 @@ export function insertLinkForCompletedWord(
   delimiterPos: number,
   bulletPrefix: string = "",
 ) {
+  if (!isUnderLinkLimit(plugin, editor, match.file)) return;
+
   const cursor = editor.getCursor();
   const line = editor.getLine(cursor.line);
 
@@ -105,6 +114,8 @@ export function handleAutonomousMode(
 ) {
   if (matches.length === 1) {
     const match = matches[0];
+    if (!isUnderLinkLimit(plugin, editor, match.file)) return;
+
     const line = editor.getLine(cursor.line);
 
     plugin.undoStack.push({
@@ -141,6 +152,8 @@ export function acceptSuggestion(
   match: NoteMatch,
   typed: string,
 ) {
+  if (!isUnderLinkLimit(plugin, editor, match.file)) return;
+
   const cursor = editor.getCursor();
   const line = editor.getLine(cursor.line);
 

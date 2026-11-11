@@ -27,10 +27,10 @@ describe("findMatches", () => {
     });
 
     it("returns nothing when the typed text is the current note's title", () => {
-      const plugin = makePluginContext(
-        {},
-        [{ basename: "Note" }, { basename: "Current" }],
-      );
+      const plugin = makePluginContext({}, [
+        { basename: "Note" },
+        { basename: "Current" },
+      ]);
       expect(findMatches(plugin, "Current", "Current")).toEqual([]);
     });
 

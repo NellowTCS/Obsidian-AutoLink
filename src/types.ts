@@ -2,6 +2,10 @@ import type { App, Editor, MarkdownView, TFile } from "obsidian";
 
 export type Mode = "autonomous" | "semiAutonomous" | "suggestions" | "custom";
 
+/** Scope used to count repeated links to a note. */
+export type LinkLimitScope = "note" | "section";
+
+/** Persisted controls shared by the editor handler and both settings interfaces. */
 export interface AutoLinkSettings {
   mode: Mode;
   minWordLength: number;
@@ -10,6 +14,8 @@ export interface AutoLinkSettings {
   customFolders: string[];
   debounceMs: number;
   maxSuggestions: number;
+  maxLinksPerNote: number;
+  maxLinksScope: LinkLimitScope;
   customAllowEnterAccept: boolean;
   customAutoInsertSingleMatch: boolean;
 }
@@ -33,6 +39,7 @@ export interface AutoLinkPluginContext {
   saveSettings: () => Promise<void>;
 }
 
+/** Initial settings, also inherited by saved settings missing newly added keys. */
 export const DEFAULT_SETTINGS: AutoLinkSettings = {
   mode: "autonomous",
   minWordLength: 3,
@@ -41,6 +48,8 @@ export const DEFAULT_SETTINGS: AutoLinkSettings = {
   customFolders: [],
   debounceMs: 300,
   maxSuggestions: 10,
+  maxLinksPerNote: 1,
+  maxLinksScope: "note",
   customAllowEnterAccept: true,
   customAutoInsertSingleMatch: true,
 };
